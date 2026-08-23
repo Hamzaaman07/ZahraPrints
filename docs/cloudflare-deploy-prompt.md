@@ -1,177 +1,116 @@
-# Deploy prompt — Zahra Prints on Cloudflare Pages
+# Deploy prompt — Zahra Prints on Cloudflare
 
 Paste everything below the line into a Claude Code session opened on this repo.
 
 ---
 
-Deploy this repo to **Cloudflare Pages** so that every push to GitHub rebuilds
-the site and serves it over HTTPS, with a separate preview URL per branch.
+Set up continuous deployment for this repo to Cloudflare, so every push builds
+and every branch gets its own HTTPS preview URL. I will do the dashboard
+clicking; you do the repo work and the verification.
 
-## Repo state — read this before you start
+## Step 1 — confirm what this repo actually is
 
-This repo currently contains **only brand assets**, not a site:
-
-- `scripts/build_logo.py` — generates the logo SVGs
-- `assets/fonts/PlayfairDisplay-{500,700}.ttf`
-- `public/brand/*.svg` — four transparent-background logo files
-- `EtsyListingsDownload.csv` and `reviews.json` — product and review data
-
-There is no `package.json`, no Vite app, no `src/`. Check this yourself with
-`ls` before assuming otherwise. If the app is still missing, do Step 0. If a
-working Vite app is already present, skip straight to Step 1.
-
-## Step 0 — scaffold the app (only if it isn't there)
-
-Build the catalog storefront described in `lovablemasterprompt.md`: Vite +
-React + TypeScript + Tailwind + shadcn/ui + React Router, with
-`scripts/build-data.ts` converting the CSV into `src/data/products.json`.
-
-If that full build is too much for one pass, build a **minimal but real**
-version first so there is something deployable, and say clearly that you did:
-
-- `npm create vite@latest . -- --template react-ts`
-- Home, Shop, and Product routes wired through React Router
-- products read from the generated `src/data/products.json`, never hardcoded
-- the logo pulled from `/brand/logo-full-on-dark.svg`
-- `npm run build` must succeed and emit `dist/`
-
-Do not wire up the deploy until `npm run build` passes locally. A green
-pipeline that ships a broken bundle is worse than no pipeline.
-
-## Step 1 — SPA routing and headers
-
-React Router needs a catch-all or `/shop` will 404 on refresh. Cloudflare Pages
-reads these from the build output, and Vite copies `public/` to `dist/`, so
-they belong in `public/`.
-
-`public/_redirects`:
+Do not guess the deploy target from the framework name. Read the real build
+output and tell me what you find:
 
 ```
-/*    /index.html   200
+npm ci
+npm run build
+find dist -type f | sort
 ```
 
-`public/_headers`:
+Then check for SSR/Worker artifacts specifically — `dist/_worker.js`,
+`functions/`, `dist/server/`, `.output/server`, a generated `wrangler.json`, or
+any Nitro/adapter package in `package.json`. Report whether this is a Worker
+(SSR) or plain static assets, and say which file made you conclude that.
 
-```
-/assets/*
-  Cache-Control: public, max-age=31536000, immutable
+Expected, as of writing: Vite 8 + React 19 + TypeScript + Tailwind v4 + React
+Router, npm with `package-lock.json`, build command `npm run build` (which runs
+`build:data` → `tsc --noEmit` → `vite build`), output `dist/`, **pure static, no
+SSR**. If what you find differs, trust your finding over this paragraph and tell
+me it changed.
 
-/brand/*
-  Cache-Control: public, max-age=604800
+## Step 2 — confirm the repo is already deploy-ready
 
-/*
-  X-Frame-Options: DENY
-  X-Content-Type-Options: nosniff
-  Referrer-Policy: strict-origin-when-cross-origin
-```
+These should already exist. Verify rather than assume, and only create what is
+genuinely missing:
 
-Also move `public/brand/README.md` to `docs/brand.md` — everything under
-`public/` gets published to the CDN, and that file should not be.
+- `.nvmrc` containing `22`
+- `public/_redirects` containing `/*    /index.html   200` — without it, React
+  Router deep links like `/shop` 404 on refresh
+- `public/_headers` — immutable caching for `/assets/*`, plus `X-Frame-Options`,
+  `X-Content-Type-Options`, `Referrer-Policy`
+- both of the above present in `dist/` after a build (Vite copies `public/`)
 
-## Step 2 — pin the toolchain
+Confirm `npm run build`, `npm run typecheck`, and `npm run lint` all pass.
 
-Write `.nvmrc` with `22`, and confirm `package.json` has:
+## Step 3 — give me the dashboard values
 
-```json
-"scripts": {
-  "build": "npm run build:data && vite build",
-  "build:data": "tsx scripts/build-data.ts",
-  "preview": "vite preview"
-}
-```
+Print the exact values for **Workers & Pages → Create → Pages → Connect to
+Git**, as a table I can paste from. Include: framework preset, build command,
+deploy command (or that it must be left empty), build output directory, root
+directory, production branch, and the `NODE_VERSION` environment variable.
 
-The data build must run before `vite build`, so `products.json` exists at
-bundle time rather than being fetched at runtime.
+Then tell me, in one line, where to enable preview builds for **all
+non-production branches**, so every branch gets its own URL before anything
+touches `main`.
 
-## Step 3 — the deploy workflow
+Do not invent an account ID, project name, API token, or URL. If you need one,
+ask me.
 
-Create `.github/workflows/deploy.yml`. This deploys on every push to `main`
-and on every pull request, giving each branch its own preview URL.
+## Step 4 — verify it for real, once I say it is connected
 
-```yaml
-name: Deploy to Cloudflare Pages
+This is the part that matters. When I tell you the first deployment ran:
 
-on:
-  push:
-    branches: ["**"]
-  pull_request:
+- Ask me for the deployment URL and the build log.
+- Fetch the production URL and assert on **what actually rendered** — real DOM
+  text and `img.naturalWidth` (0 means the image failed even though the element
+  exists). Do not conclude it works because the build was green.
+- Load a deep link (`/shop`) **directly** and reload it, to prove the
+  `_redirects` catch-all is actually applied. This is the single most likely
+  thing to be silently broken.
+- Confirm the branch preview URL resolves. Branch names are lowercased with
+  non-alphanumerics replaced by hyphens.
+- Confirm `/brand/logo-horizontal-on-dark.svg` returns 200.
 
-concurrency:
-  group: deploy-${{ github.ref }}
-  cancel-in-progress: true
+If any check fails, fix it and re-verify. If a measurement says nothing changed,
+treat it as broken until you have specifically proved otherwise — do not
+explain a null result away as caching or a slow edge.
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      deployments: write
-    steps:
-      - uses: actions/checkout@v4
+Say plainly what you could not verify from your environment. You have no
+Cloudflare credentials, so anything about the account, the build runner, or
+billing is outside what you can check — tell me rather than guessing.
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
+## Step 5 — if the first build fails
 
-      - run: npm ci
-      - run: npm run build
+Ask me for the build log and fix the cause. Most likely candidates, in order:
 
-      - name: Deploy
-        id: deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: >-
-            pages deploy dist
-            --project-name=zahra-prints
-            --branch=${{ github.head_ref || github.ref_name }}
+1. Node version — the runner defaulting to 18 or 20 breaks Vite 8. `NODE_VERSION=22`.
+2. `npm ci` failing because `package-lock.json` is out of sync with `package.json`.
+3. The build output directory set to something other than `dist`.
 
-      - name: Show URL
-        run: echo "${{ steps.deploy.outputs.deployment-url }}"
-```
+Do not paper over a failure by disabling the typecheck in `npm run build`.
 
-## Step 4 — what you cannot do, and I must
+## Alternative, only if I ask for it: deploy from GitHub Actions instead
 
-Stop here and tell me these steps in plain language. Do not invent values, do
-not commit any token, and do not claim the site is live before I have done
-this and a run has actually gone green.
+If I would rather not use the dashboard Git integration, set up
+`.github/workflows/deploy.yml` using `cloudflare/wrangler-action@v3` with
+`command: pages deploy dist --project-name=zahra-prints --branch=${{ github.head_ref || github.ref_name }}`,
+`actions/setup-node@v4` with `node-version-file: .nvmrc`, and a
+`concurrency` group keyed on `github.ref`.
 
-1. Create the Pages project once. Either I run it locally:
-   `npx wrangler@latest pages project create zahra-prints --production-branch main`
-   or you tell me to create it in the Cloudflare dashboard.
-2. Get my **Account ID** from the Cloudflare dashboard sidebar.
-3. Create an **API token** at Cloudflare → My Profile → API Tokens, with the
-   permission `Account → Cloudflare Pages → Edit`.
-4. Add both to GitHub → repo Settings → Secrets and variables → Actions, named
-   exactly `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+That route needs me to add `CLOUDFLARE_API_TOKEN` (permission: Account →
+Cloudflare Pages → Edit) and `CLOUDFLARE_ACCOUNT_ID` as GitHub Actions secrets,
+and to create the project once with
+`npx wrangler pages project create zahra-prints --production-branch main`.
+Never commit a token, and never print one back to me.
 
-## Step 5 — verify, don't assume
+## Working rules for this task
 
-After I confirm the secrets are in place, push and then actually check:
-
-- the workflow run succeeded — report the real conclusion, not an assumption
-- production is live at `https://zahra-prints.pages.dev`
-- the branch preview resolves at
-  `https://<branch>.zahra-prints.pages.dev` (branch names are lowercased and
-  non-alphanumerics become hyphens)
-- deep links work: load `/shop` directly and refresh it, confirming the
-  `_redirects` catch-all is being applied
-- the logo loads from `/brand/logo-full-on-dark.svg`
-
-If any check fails, fix it and re-verify. Report what you actually observed,
-including failures — a red run reported as green costs me more time than the
-failure itself.
-
-## Notes
-
-- Cloudflare now steers new projects toward Workers static assets, but Pages
-  gives per-branch preview URLs with no extra config, which is exactly what
-  this site needs. Pages remains fully supported.
-- HTTPS and the certificate are automatic on `*.pages.dev`; there is nothing
-  to configure.
-- For a custom domain later: Pages project → Custom domains → add the domain.
-  That needs my dashboard access, so tell me rather than attempting it.
-- Etsy CDN image URLs (`i.etsystatic.com`) are hotlinked and temporary. Keep
-  the data layer able to swap them for local optimized assets later.
+- Work on a branch, never commit straight to `main`.
+- Run typecheck, lint, and build before pushing.
+- Open a PR whose test plan says what you actually verified, not what you assume.
+- After I merge, run `git log origin/main..origin/<branch>` and confirm it is
+  empty before telling me anything is live.
+- Record anything non-obvious in `CLAUDE.md` — especially gotchas that cost real
+  time and how to correctly verify the tricky parts.
