@@ -143,11 +143,22 @@ the data layer able to swap `images[]` for local optimized assets later.
 | `--color-amber` | `#F5B324` | rosette gold, primary accent |
 | `--color-gold` | `#DFA31B` | deeper gold, hairlines and hover |
 | `--color-umber` | `#8A5A12` | wordmark brown, secondary surfaces |
-| `--color-ember` | `#C2571A` | **CTAs only** — never decoration |
+| `--color-ember` | `#C85D1E` | **CTA fill only** — never decoration |
 | `--color-sand` | `#EFE4D2` | warm bone, primary text on dark |
 
 Dark-first. `--color-ember` is reserved so the primary action never blends into
 ornament; using it anywhere else breaks that contract.
+
+**Two contrast constraints, measured not guessed** (see `docs/design-direction.md`):
+
+- Ember was moved from the brief's `#C2571A` to `#C85D1E`. At the original value
+  the Buy-on-Etsy button fails AA both ways — sand on it 3.57:1, ink on it
+  4.40:1, against a 4.5:1 requirement. The CTA is **ember fill with ink text**,
+  4.75:1.
+- **`--color-umber` must never carry text on dark.** 3.35:1 on ink, below AA.
+  It is a surface and hairline colour only. On light grounds (the wordmark) it
+  is fine.
+- `--color-sand` at 72% (`#AFA79A`) is the dimmed body text, still 8.31:1.
 
 ## Constraints that must keep holding
 
