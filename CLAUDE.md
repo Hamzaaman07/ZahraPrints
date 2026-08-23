@@ -120,8 +120,12 @@ the shop homepage while it is blank. These get filled in later.
 
 ## Assets
 
-`data/logo.png` referenced in the brief **does not exist** — the logo arrived as
-a pasted image, so it was rebuilt as vector instead. `scripts/build_logo.py`
+`data/logo.png` referenced in the brief **does not exist**. The logo has twice
+arrived as an image pasted inline in chat, which this environment renders to the
+model but never writes to disk — so it cannot be traced or colour-sampled. It
+was rebuilt as vector from visual inspection instead. To supply the real file,
+commit it to the repo (or attach it as a file upload rather than pasting it);
+then the leaf shapes can be retraced and the palette sampled from real pixels. `scripts/build_logo.py`
 generates four transparent-background SVGs into `public/brand/`: full lockup and
 standalone mark, each in a light-surface (umber) and dark-surface (sand)
 variant. The wreath is constructed from one sprig rotated 45° eight times, so

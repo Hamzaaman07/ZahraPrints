@@ -144,6 +144,17 @@ def sprig() -> str:
     return "\n".join(out)
 
 
+FRAME_R = 84.0  # circumradius of the hairline octagon around the monogram
+
+
+def octagon_frame(indent: str = "  ") -> str:
+    """Thin octagon enclosing the Z, rotated so flats face the axes."""
+    pts = [polar(FRAME_R, 22.5 + i * 45.0) for i in range(SPRIGS)]
+    d = "M " + " L ".join(fmt(*pt) for pt in pts) + " Z"
+    return (f'{indent}<path d="{d}" fill="none" stroke="{GOLD}" '
+            f'stroke-width="2.6" stroke-linejoin="round"/>')
+
+
 def wreath(indent: str = "  ") -> str:
     unit = sprig()
     parts = []
@@ -241,7 +252,8 @@ def build() -> None:
 
     # --- the mark on its own -------------------------------------------------
     z_d = bold.outlines("Z", size=74.0, tracking=0.0, x=CX, baseline=CY + 37.0)
-    mark_body = wreath() + f'\n  <path d="{z_d}" fill="{UMBER}"/>'
+    mark_body = (wreath() + "\n" + octagon_frame()
+                 + f'\n  <path d="{z_d}" fill="{UMBER}"/>')
     mark = document("0 0 400 400", 400, 400, "zp-mark",
                     "Zahra Prints monogram", mark_body)
     write("logo-mark.svg", mark)
@@ -273,7 +285,7 @@ def build() -> None:
     def lockup(word_fill: str, tid: str) -> str:
         body = (
             f'  <g transform="translate({mark_x:.2f} {mark_y:.2f}) '
-            f'scale({mark_scale})">\n{wreath("    ")}\n'
+            f'scale({mark_scale})">\n{wreath("    ")}\n{octagon_frame("    ")}\n'
             f'    <path d="{z_d}" fill="{word_fill}"/>\n  </g>\n'
             f'  <path d="{word_d}" fill="{word_fill}"/>\n'
             f'  <path d="{tag_d}" fill="{AMBER}"/>'
@@ -283,6 +295,40 @@ def build() -> None:
 
     write("logo-full.svg", lockup(UMBER, "zp-full"))
     write("logo-full-on-dark.svg", lockup(SAND, "zp-full-dark"))
+
+    # --- horizontal lockup: mark left, type right ------------------------
+    # Proportions read off the horizontal artwork: the wordmark runs about
+    # 2.5x the mark's width, and the tagline tracks out to nearly match it.
+    h_scale = 0.66
+    h_mark_x, h_mark_y = 12.0, 18.0
+
+    h_word_size, h_word_width, h_word_gap = 62.0, 660.0, 20.0
+    h_word_track = bold.solve_tracking("ZAHRA PRINTS", h_word_size,
+                                       h_word_width, h_word_gap)
+    h_word_d = bold.outlines("ZAHRA PRINTS", size=h_word_size,
+                             tracking=h_word_track, x=320.0, baseline=162.0,
+                             anchor="start", word_extra=h_word_gap)
+
+    h_tag_size, h_tag_width, h_tag_gap = 24.0, 652.0, 12.0
+    h_tag_track = medium.solve_tracking("QUALITY ON WALLAHI", h_tag_size,
+                                        h_tag_width, h_tag_gap)
+    h_tag_d = medium.outlines("QUALITY ON WALLAHI", size=h_tag_size,
+                              tracking=h_tag_track, x=322.0, baseline=212.0,
+                              anchor="start", word_extra=h_tag_gap)
+
+    def horizontal(word_fill: str, tid: str) -> str:
+        body = (
+            f'  <g transform="translate({h_mark_x:.2f} {h_mark_y:.2f}) '
+            f'scale({h_scale})">\n{wreath("    ")}\n{octagon_frame("    ")}\n'
+            f'    <path d="{z_d}" fill="{word_fill}"/>\n  </g>\n'
+            f'  <path d="{h_word_d}" fill="{word_fill}"/>\n'
+            f'  <path d="{h_tag_d}" fill="{AMBER}"/>'
+        )
+        return document("0 0 1000 300", 1000, 300, tid,
+                        "Zahra Prints — Quality on Wallahi", body)
+
+    write("logo-horizontal.svg", horizontal(UMBER, "zp-h"))
+    write("logo-horizontal-on-dark.svg", horizontal(SAND, "zp-h-dark"))
 
 
 def write(name: str, svg: str) -> None:
