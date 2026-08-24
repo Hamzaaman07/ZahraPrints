@@ -183,6 +183,27 @@ Tile outlines are scaffolding and are **never** emitted — only straps.
 `scripts/girih/preview-tiles.ts` and `preview-field.ts` draw the scaffolding for
 inspection; those outputs go to a scratch dir, never to `public/`.
 
+## The carved screen (WebGL hero)
+
+`src/components/GirihScreen.tsx` extrudes the same verified strap segments into
+solid bars — one `InstancedMesh` carries every bar across every layer, so ~3,900
+bars cost one draw call. Layers sit at increasing depth rotated by multiples of
+36°, the tiling's own symmetry step, so camera movement slides them into real
+parallax. Lighting uses drei `Lightformer`s inside `<Environment>` rather than an
+HDR file, so there is nothing external to fetch and it survives a strict CSP.
+
+`useImmersive()` returns three tiers. `prefers-reduced-motion` gives **off** (flat
+SVG field only) — that is a stated preference, honoured on every screen size.
+Phones get **low**: same screen, 2 layers instead of 4, lower dpr, no bloom.
+Wider screens get **high**.
+
+The 3D chunk is `lazy()`-imported and the tier starts at "off", so a phone under
+reduced motion never downloads three.js at all. Keep it that way: main bundle is
+~105 KB gzipped, the screen chunk ~276 KB.
+
+The flat `GirihField` always paints underneath at low opacity, so the hero is
+never empty while the chunk loads.
+
 ## Fonts are self-hosted
 
 `public/fonts/` holds Playfair Display and Jost (variable, latin subset) and
@@ -270,6 +291,24 @@ Verify a webfont actually loaded by checking `[...document.fonts]` is non-empty
 with `status === "loaded"`, **and** by measuring: render the same string in the
 target family and in a generic fallback and confirm the widths differ. Identical
 widths mean you are still looking at the fallback.
+
+### Gotcha: you cannot read a WebGL canvas back with `drawImage`
+
+Sampling a WebGL canvas via `drawImage`/`getImageData`/`toDataURL` returns
+**fully transparent black** unless the context was created with
+`preserveDrawingBuffer: true` — the drawing buffer is cleared once the frame is
+composited. This reported `litPixels: 0, maxAlpha: 0` on a scene that was
+rendering perfectly, which reads exactly like a broken renderer.
+
+Measure the **composited screenshot** instead: `page.screenshot()` then sample
+the PNG. To prove the camera actually responds to input, screenshot the
+**canvas element** (not the page) before and after, and diff the pixels — an
+element screenshot travels with the element, so page scroll doesn't pollute the
+comparison. Scrolling the page and clipping a fixed region measures the page
+moving, not the camera.
+
+Chromium needs `--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader`
+to render WebGL headless here.
 
 ### Gotcha: `pathLength` is an SVG attribute, not a CSS property
 
