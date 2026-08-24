@@ -135,6 +135,33 @@ the eightfold symmetry is exact. Rerun with `python3 scripts/build_logo.py`
 Product imagery is hotlinked from `i.etsystatic.com` and is **temporary**. Keep
 the data layer able to swap `images[]` for local optimized assets later.
 
+## Pages
+
+```
+src/App.tsx            layout shell + routes
+src/routes/            Home, Shop, Product, Reviews, About, NotFound
+src/lib/catalog.ts     typed catalogue access, filtering, sorting, swatches
+src/lib/seo.ts         per-page title/description/OG, no helmet dependency
+```
+
+Home and About carry the heavy motion; Shop and Product stay deliberately
+cheap, because that is where people actually browse and buy. `About` is
+`lazy()`-imported.
+
+**Shop's category filter is seeded from `?category=`**, and `App.tsx` keys the
+route on the query string so arriving with a different category remounts and
+re-seeds. That avoids a state-sync effect — React lint rightly rejects
+`setState` inside an effect for this.
+
+**Product resets its gallery during render**, not in an effect
+(`if (gallery.id !== id) setGallery(...)`). An effect would paint the previous
+product's photos for a frame first.
+
+Three data facts the UI must keep tolerating, all real in the export: one
+product has **no colours and no sizes**, five have **no specs** (the page shows
+the blurb and a pointer to Etsy instead), and `etsyUrl` is empty for every
+product so `etsyLink()` falls back to the shop homepage.
+
 ## The girih generator (the site's signature element)
 
 ```
@@ -182,6 +209,27 @@ pass per ring, and its `ground` prop must match the surface behind it.
 Tile outlines are scaffolding and are **never** emitted — only straps.
 `scripts/girih/preview-tiles.ts` and `preview-field.ts` draw the scaffolding for
 inspection; those outputs go to a scratch dir, never to `public/`.
+
+## The carved screen (WebGL hero)
+
+`src/components/GirihScreen.tsx` extrudes the same verified strap segments into
+solid bars — one `InstancedMesh` carries every bar across every layer, so ~3,900
+bars cost one draw call. Layers sit at increasing depth rotated by multiples of
+36°, the tiling's own symmetry step, so camera movement slides them into real
+parallax. Lighting uses drei `Lightformer`s inside `<Environment>` rather than an
+HDR file, so there is nothing external to fetch and it survives a strict CSP.
+
+`useImmersive()` returns three tiers. `prefers-reduced-motion` gives **off** (flat
+SVG field only) — that is a stated preference, honoured on every screen size.
+Phones get **low**: same screen, 2 layers instead of 4, lower dpr, no bloom.
+Wider screens get **high**.
+
+The 3D chunk is `lazy()`-imported and the tier starts at "off", so a phone under
+reduced motion never downloads three.js at all. Keep it that way: main bundle is
+~105 KB gzipped, the screen chunk ~276 KB.
+
+The flat `GirihField` always paints underneath at low opacity, so the hero is
+never empty while the chunk loads.
 
 ## Fonts are self-hosted
 
@@ -270,6 +318,24 @@ Verify a webfont actually loaded by checking `[...document.fonts]` is non-empty
 with `status === "loaded"`, **and** by measuring: render the same string in the
 target family and in a generic fallback and confirm the widths differ. Identical
 widths mean you are still looking at the fallback.
+
+### Gotcha: you cannot read a WebGL canvas back with `drawImage`
+
+Sampling a WebGL canvas via `drawImage`/`getImageData`/`toDataURL` returns
+**fully transparent black** unless the context was created with
+`preserveDrawingBuffer: true` — the drawing buffer is cleared once the frame is
+composited. This reported `litPixels: 0, maxAlpha: 0` on a scene that was
+rendering perfectly, which reads exactly like a broken renderer.
+
+Measure the **composited screenshot** instead: `page.screenshot()` then sample
+the PNG. To prove the camera actually responds to input, screenshot the
+**canvas element** (not the page) before and after, and diff the pixels — an
+element screenshot travels with the element, so page scroll doesn't pollute the
+comparison. Scrolling the page and clipping a fixed region measures the page
+moving, not the camera.
+
+Chromium needs `--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader`
+to render WebGL headless here.
 
 ### Gotcha: `pathLength` is an SVG attribute, not a CSS property
 
