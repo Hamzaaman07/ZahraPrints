@@ -65,6 +65,63 @@ function overlaps(candidate: Placed, placed: Placed[]): boolean {
 const key = ([x, y]: Vec) => `${x.toFixed(4)},${y.toFixed(4)}`;
 const edgeKey = (a: Vec, b: Vec) => [key(a), key(b)].sort().join("|");
 
+/**
+ * Grow the patch in two phases.
+ *
+ * Growing greedily in one pass looks wrong: the first decagon that fits wins,
+ * after which decagons rarely fit again, so the field fills with elongated
+ * hexagons and the ten-pointed stars end up sparse and scattered. Historical
+ * girih reads regular because the decagons sit on a network of their own.
+ *
+ * So phase one lays decagons edge-to-edge and lets overlap rejection space
+ * them: neighbours 36° apart collide, neighbours 72° apart clear (centre gap
+ * 361.8 against a circumdiameter of 323.6), which yields the classic ring of
+ * five. Phase two fills whatever is left between them.
+ */
+export function growNetwork(maxTiles: number, radius: number): Placed[] {
+  const placed: Placed[] = [{ name: "decagon", verts: tileVertices("decagon") }];
+
+  // Phase 1 — the decagon network.
+  for (let i = 0; i < placed.length && placed.length < maxTiles; i++) {
+    const tile = placed[i];
+    if (tile.name !== "decagon") continue;
+    tile.verts.forEach((v, e) => {
+      const w = tile.verts[(e + 1) % tile.verts.length];
+      if (len(centroid([v, w])) > radius) return;
+      for (let k = 0; k < 10; k++) {
+        const cand = seat("decagon", k, v, w);
+        if (len(centroid(cand.verts)) > radius) continue;
+        if (!overlaps(cand, placed)) { placed.push(cand); break; }
+      }
+    });
+  }
+
+  // Phase 2 — fill the gaps, smallest-first so thin slots still close.
+  const fillers: TileName[] = ["bowtie", "hexagon", "pentagon", "rhombus"];
+  for (let pass = 0; pass < 12; pass++) {
+    const before = placed.length;
+    for (let i = 0; i < placed.length && placed.length < maxTiles; i++) {
+      const tile = placed[i];
+      tile.verts.forEach((v, e) => {
+        const w = tile.verts[(e + 1) % tile.verts.length];
+        if (len(centroid([v, w])) > radius) return;
+        for (const name of fillers) {
+          const n = tileVertices(name).length;
+          let done = false;
+          for (let k = 0; k < n && !done; k++) {
+            const cand = seat(name, k, v, w);
+            if (len(centroid(cand.verts)) > radius) continue;
+            if (!overlaps(cand, placed)) { placed.push(cand); done = true; }
+          }
+          if (done) break;
+        }
+      });
+    }
+    if (placed.length === before) break;
+  }
+  return placed;
+}
+
 /** Grow a patch outward from a seed tile, largest tiles first. */
 export function growTiling(seed: TileName, maxTiles: number, radius: number): Placed[] {
   const order: TileName[] = ["decagon", "hexagon", "bowtie", "pentagon", "rhombus"];

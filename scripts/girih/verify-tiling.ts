@@ -1,11 +1,11 @@
-import { growTiling, centroid, strapsOf } from "./tiling.js";
+import { growNetwork, centroid, strapsOf } from "./tiling.js";
 import { tileVertices, sub, len, EDGE } from "./tiles.js";
 import type { Vec } from "./tiles.js";
 
 import { checker } from "./assert.js";
 const { check, done } = checker();
 
-const patch = growTiling("decagon", 90, 620);
+const patch = growNetwork(400, 900);
 const counts: Record<string, number> = {};
 for (const t of patch) counts[t.name] = (counts[t.name] ?? 0) + 1;
 console.log(`placed ${patch.length} tiles:`, counts);
