@@ -1,0 +1,56 @@
+# Deploys to Cloudflare Pages on every push, giving each branch its own
+# preview URL.
+#
+# Dormant until the repo has CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID
+# set as Actions secrets — the job is skipped rather than failed, so pushes
+# stay green while the account side is still unconfigured.
+#
+# If you connect the repo through the Cloudflare dashboard instead, delete this
+# file: the dashboard builds it itself and you do not want both.
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ vars.CLOUDFLARE_ENABLED == 'true' }}
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # Same checks that gate a local push, so a broken build never deploys.
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run verify:girih
+      - run: npm run build
+
+      - name: Deploy
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: >-
+            pages deploy dist
+            --project-name=zahra-prints
+            --branch=${{ github.head_ref || github.ref_name }}
+
+      - name: Show deployment URL
+        run: echo "Deployed to ${{ steps.deploy.outputs.deployment-url }}"
