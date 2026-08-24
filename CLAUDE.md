@@ -135,6 +135,33 @@ the eightfold symmetry is exact. Rerun with `python3 scripts/build_logo.py`
 Product imagery is hotlinked from `i.etsystatic.com` and is **temporary**. Keep
 the data layer able to swap `images[]` for local optimized assets later.
 
+## Pages
+
+```
+src/App.tsx            layout shell + routes
+src/routes/            Home, Shop, Product, Reviews, About, NotFound
+src/lib/catalog.ts     typed catalogue access, filtering, sorting, swatches
+src/lib/seo.ts         per-page title/description/OG, no helmet dependency
+```
+
+Home and About carry the heavy motion; Shop and Product stay deliberately
+cheap, because that is where people actually browse and buy. `About` is
+`lazy()`-imported.
+
+**Shop's category filter is seeded from `?category=`**, and `App.tsx` keys the
+route on the query string so arriving with a different category remounts and
+re-seeds. That avoids a state-sync effect — React lint rightly rejects
+`setState` inside an effect for this.
+
+**Product resets its gallery during render**, not in an effect
+(`if (gallery.id !== id) setGallery(...)`). An effect would paint the previous
+product's photos for a frame first.
+
+Three data facts the UI must keep tolerating, all real in the export: one
+product has **no colours and no sizes**, five have **no specs** (the page shows
+the blurb and a pointer to Etsy instead), and `etsyUrl` is empty for every
+product so `etsyLink()` falls back to the shop homepage.
+
 ## The girih generator (the site's signature element)
 
 ```
