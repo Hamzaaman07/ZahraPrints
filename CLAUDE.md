@@ -135,6 +135,52 @@ the eightfold symmetry is exact. Rerun with `python3 scripts/build_logo.py`
 Product imagery is hotlinked from `i.etsystatic.com` and is **temporary**. Keep
 the data layer able to swap `images[]` for local optimized assets later.
 
+## The girih generator (the site's signature element)
+
+```
+scripts/girih/tiles.ts      five tile definitions, vertices derived from angles
+scripts/girih/strapwork.ts  54° straps, by construction
+scripts/girih/tiling.ts     edge-matched placement + overlap rejection
+scripts/build-girih.ts      → src/data/girih.json (rings of path data)
+```
+
+`npm run verify:girih` runs all three verifiers. They assert on measured
+geometry, not on intent: every tile closes, every edge is length 100, measured
+angles match the table, every strap meets its edge at exactly 54°, every strap
+endpoint lands on an edge midpoint, every midpoint carries exactly two straps,
+and placement never distorts or duplicates a tile.
+
+**The strap pairing rule is the subtle part.** Straps weave over and under one
+another, so an intersection is *not* automatically where a strap stops. Pairing
+rays by "nearest intersection" is wrong and fails loudly — it starves the
+pentagon to zero straps and gives the decagon a ring of short chords instead of
+a ten-pointed star. The correct rule: a ray ends where it either reaches another
+edge midpoint (a straight strap) or meets a partner **symmetrically**, both
+having travelled the same distance, which is a mirror line of the tile. Every
+nearer intersection is a crossing it passes straight through. Corners must also
+be tested to fall strictly inside the tile, or the non-convex bowtie pairs
+through its own waist.
+
+Tile outlines are scaffolding and are **never** emitted — only straps.
+`scripts/girih/preview-tiles.ts` and `preview-field.ts` draw the scaffolding for
+inspection; those outputs go to a scratch dir, never to `public/`.
+
+## Fonts are self-hosted
+
+`public/fonts/` holds Playfair Display and Jost (variable, latin subset) and
+Amiri subset to the four approved Arabic phrases — 84 KB total. Regenerate with
+`bash scripts/fetch-fonts.sh` (needs `fonttools` and `brotli`).
+
+Self-hosted rather than linked from Google because it removes two extra DNS+TLS
+handshakes on the critical path for a phone-heavy audience, and because the site
+then renders correctly on networks that cannot reach `fonts.googleapis.com`.
+
+The Amiri subset keeps `init`, `medi`, `fina`, `rlig` and `ccmp`, which is what
+makes contextual shaping work. **Subsetting without those features produces
+disconnected letterforms** — exactly the failure the Arabic rules exist to
+prevent. If a phrase is ever added, update `PHRASES` in `scripts/fetch-fonts.sh`
+*and* `APPROVED` in `src/components/Arabic.tsx`, then rerun.
+
 ## Palette
 
 | Token | Hex | Use |
@@ -194,6 +240,25 @@ run `playwright install`.
 If a measurement says nothing changed, treat it as broken until proven
 otherwise. Don't explain a null result away as a stale frame or a slow
 environment without specifically proving that's the cause.
+
+### Gotcha: `document.fonts.check()` lies when no `@font-face` exists
+
+`document.fonts.check('16px Amiri')` returns **true** when there is no matching
+`@font-face` rule at all — it reports "a font can render this", not "your webfont
+loaded". It reported success while the Google Fonts stylesheet was failing with
+`ERR_CONNECTION_RESET` and `document.fonts` was completely empty.
+
+Verify a webfont actually loaded by checking `[...document.fonts]` is non-empty
+with `status === "loaded"`, **and** by measuring: render the same string in the
+target family and in a generic fallback and confirm the widths differ. Identical
+widths mean you are still looking at the fallback.
+
+### Gotcha: `pathLength` is an SVG attribute, not a CSS property
+
+Setting `pathLength: 1` in a CSS rule does nothing. It has to be the attribute
+`pathLength={1}` on the `<path>`. Without it, `stroke-dasharray: 1` leaves a
+one-unit dash on a path thousands of units long and the draw-in silently fails
+while looking like it should work.
 
 ### Gotcha: `pkill -f` kills the tool shell
 

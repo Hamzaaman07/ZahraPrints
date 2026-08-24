@@ -1,15 +1,82 @@
+/* Fonts are self-hosted, not pulled from Google.
+   Two reasons: it removes two extra DNS+TLS handshakes on the critical path for
+   a phone-heavy audience, and it means the site renders correctly on networks
+   that cannot reach fonts.googleapis.com. Amiri is subset to just the four
+   approved phrases (15 KB instead of ~500 KB) with init/medi/fina/rlig kept, so
+   Arabic still shapes correctly. Regenerate with scripts/fetch-fonts.sh. */
+@font-face {
+  font-family: "Playfair Display";
+  src: url("/fonts/playfair-display.woff2") format("woff2");
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Jost";
+  src: url("/fonts/jost.woff2") format("woff2");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Amiri";
+  src: url("/fonts/amiri-subset.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020, U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF;
+}
+
 @import "tailwindcss";
 
 @theme {
+  /* Brand — see docs/design-direction.md for the measured contrast ratios. */
   --color-ink: #0b0a08;
+  --color-ink-raised: #14120e;
+  --color-ink-sunken: #070604;
   --color-amber: #f5b324;
   --color-gold: #dfa31b;
   --color-umber: #8a5a12;
-  --color-ember: #c2571a;
+  /* Nudged from the brief's #C2571A: at that value neither sand nor ink text
+     reached AA on the CTA. Ink on this passes at 4.75:1. */
+  --color-ember: #c85d1e;
   --color-sand: #efe4d2;
+
+  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-ui: "Jost", ui-sans-serif, system-ui, sans-serif;
+  --font-arabic: "Amiri", "Scheherazade New", serif;
+
+  --text-hero: clamp(3.5rem, 11vw, 8.5rem);
+  --text-1: clamp(2.6rem, 5.5vw, 4.2rem);
+  --text-2: 2.37rem;
+  --text-3: 1.78rem;
+  --text-4: 1.33rem;
 }
 
 body {
   background: var(--color-ink);
   color: var(--color-sand);
+  font-family: var(--font-ui);
+}
+
+/* The carved ground drawing itself in. Each path carries pathLength="1" as an
+   SVG *attribute* (see GirihField.tsx) — it is not a CSS property, and setting
+   it here would leave a 1-unit dash on a path thousands of units long. That
+   normalises every ring to the same dash budget so they draw at one rate. */
+@keyframes girih-draw {
+  from { stroke-dashoffset: 1; }
+  to   { stroke-dashoffset: 0; }
+}
+
+.girih-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: girih-draw 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .girih-draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
 }
