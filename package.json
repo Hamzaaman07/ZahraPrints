@@ -4,12 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build:data": "tsx scripts/build-data.ts",
+    "build:data": "tsx scripts/build-data.ts && npm run build:girih",
     "dev": "npm run build:data && vite",
     "build": "npm run build:data && tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:girih": "tsx scripts/build-girih.ts",
+    "verify:girih": "tsx scripts/girih/verify-tiles.ts && tsx scripts/girih/verify-straps.ts && tsx scripts/girih/verify-tiling.ts"
   },
   "dependencies": {
     "react": "^19.2.8",
