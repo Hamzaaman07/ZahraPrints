@@ -9,14 +9,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { growTiling, strapsOf, centroid } from "./girih/tiling.js";
+import { growNetwork, strapsOf, centroid } from "./girih/tiling.js";
 import type { Vec } from "./girih/tiles.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RINGS = 8;
 
 /** Grown wider than the crop so straps run off every edge instead of stopping ragged. */
-const patch = growTiling("decagon", 220, 1150);
+const patch = growNetwork(900, 1250);
 const straps = strapsOf(patch);
 
 const dist = (p: Vec) => Math.hypot(p[0], p[1]);

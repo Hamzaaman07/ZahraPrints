@@ -161,6 +161,24 @@ nearer intersection is a crossing it passes straight through. Corners must also
 be tested to fall strictly inside the tile, or the non-convex bowtie pairs
 through its own waist.
 
+**Grow the patch in two phases, not greedily.** A single greedy pass looks
+wrong: the first decagon that fits wins, after which decagons rarely fit again,
+so the field fills with elongated hexagons (4 decagons to 193 hexagons) and the
+ten-pointed stars end up sparse and scattered — it reads as messy. Historical
+girih is regular because the decagons sit on a network of their own. So
+`growNetwork()` lays decagons edge-to-edge first and lets overlap rejection
+space them: neighbours 36° apart collide, neighbours 72° apart clear (centre gap
+361.8 against a circumdiameter of 323.6), giving the classic ring of five. Phase
+two fills the gaps. That flips the mix to roughly 51 decagons / 75 bowties and
+the star grid becomes even.
+
+**Straps render as interlaced double-line bands**, which is how drawn girih
+reads. Each ring is stroked thick in the band colour, then re-stroked thinner in
+the ground colour on top, leaving two parallel edges — no extra path data. All
+thick passes must be emitted before any thin pass, or a later band paints over
+an earlier one's inner line. `GirihField` therefore renders two groups, not one
+pass per ring, and its `ground` prop must match the surface behind it.
+
 Tile outlines are scaffolding and are **never** emitted — only straps.
 `scripts/girih/preview-tiles.ts` and `preview-field.ts` draw the scaffolding for
 inspection; those outputs go to a scratch dir, never to `public/`.
